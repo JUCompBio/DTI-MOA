@@ -10,6 +10,15 @@ import preprocessing_utils
 dirpath = os.path.dirname(__file__)
 
 
+def encode_and_save(model, seq, seq_id, root, prot=True):
+    file_name = seq_id
+    if prot:
+        file_name += "_" + seq[:200]
+        seq = " ".join(list(prot))
+
+    torch.save(model(seq), os.path.join(root, f"{file_name}.pt"))
+
+
 # Encode the targets and drugs
 def main(args):
     parser = argparse.ArgumentParser()
@@ -36,32 +45,22 @@ def main(args):
 
     if args.aa:
         prot_model = preprocessing_utils.MyFeatureExtractionPipeline(task="feature-extraction", model=AutoModel.from_pretrained(args.aa_model), tokenizer=AutoTokenizer.from_pretrained(args.aa_model), return_tensors=True, device=device)
+
         df_ = df.drop_duplicates(subset=["uniprotkb-id", "aa-seq"])
         for _, row in tqdm(df_.iterrows(), total=len(df_)):
-            uni = row["uniprotkb-id"]
-            file_name = uni + "_" + row["aa-seq"][:200]
-            if uni in df["uniprotkb-id"].unique():
-                prot = row["aa-seq"]
-                prot = " ".join(list(prot))
-                torch.save(prot_model(prot), os.path.join(prot_enc_dir, f"{file_name}.pt"))
+            encode_and_save(prot_model, row["aa-seq"], row["uniprotkb-id"], prot_enc_dir)
 
-        for _, row in tqdm(df.loc[df["type"] == "polypeptide"].drop_duplicates(subset=["drugbank-id", "structure"]).iterrows(), total=len(df.loc[df["type"] == "polypeptide"].drop_duplicates(subset=["drugbank-id", "structure"]))):
-            uni = row["drugbank-id"]
-            file_name = uni + "_" + row["structure"][:200]
-            if uni in df["drugbank-id"].unique():
-                prot = row["structure"]
-                prot = " ".join(list(prot))
-                torch.save(prot_model(prot), os.path.join(prot_enc_dir, f"{file_name}.pt"))
+        df_ = df.loc[df["type"] == "polypeptide"].drop_duplicates(subset=["drugbank-id", "structure"])
+        for _, row in tqdm(df_.iterrows(), total=len(df_)):
+            encode_and_save(prot_model, row["structure"], row["drugbank-id"], prot_enc_dir)
 
     del prot_model
 
     if args.smiles:
-        smile_model = preprocessing_utils.MyFeatureExtractionPipeline(task="feature-extraction", model=AutoModel.from_pretrained(args.smiles_model), tokenizer=AutoTokenizer.from_pretrained(args.smiles_model), return_tensors=True, device=device)
+        smiles_model = preprocessing_utils.MyFeatureExtractionPipeline(task="feature-extraction", model=AutoModel.from_pretrained(args.smiles_model), tokenizer=AutoTokenizer.from_pretrained(args.smiles_model), return_tensors=True, device=device)
         df_ = df.loc[df["type"] == "SMILES"].drop_duplicates(subset=["drugbank-id", "structure"])
         for _, row in tqdm(df_.iterrows(), total=len(df_)):
-            db = row["drugbank-id"]
-            if db in df["drugbank-id"].unique():
-                torch.save(smile_model(row["structure"]), os.path.join(prot_enc_dir, f"{db}.pt"))
+            encode_and_save(smiles_model, row["structure"], row["drugbank-id"], smiles_enc_dir, False)
 
 
 if __name__ == "__main__":
