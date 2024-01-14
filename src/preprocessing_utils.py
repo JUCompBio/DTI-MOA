@@ -70,7 +70,7 @@ def uniprot_to_dssp(uid, try_pdb=False):
     """
     dirpath = os.path.dirname(__file__)
     # Check if Alphafold already has a 3D prediction for the given uniprot id
-    pdb_path = download_alphafold_pdb_file(uid, os.path.join(dirpath, "../data/pdb/"), uid)
+    pdb_path = download_alphafold_pdb_file(uid, os.path.join(dirpath, "../data/pdb/"))
     if pdb_path:
         dssp_path = perform_dssp(os.path.join(dirpath, "../data/pdb/"), os.path.join(dirpath, "../data/dssp/"), uid)
         if os.path.exists(dssp_path) and parse_dssp(dssp_path):
