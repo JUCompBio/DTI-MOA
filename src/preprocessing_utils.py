@@ -8,7 +8,7 @@ from rdkit import Chem
 import gzip
 import shutil
 from transformers.pipelines.feature_extraction import FeatureExtractionPipeline
-from .utils import parse_dssp
+from utils import parse_dssp
 
 
 def download_alphafold_pdb_file(uid: str, root: str):
