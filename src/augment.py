@@ -39,7 +39,7 @@ def main(args):
     new_df_ = new_df_.loc[new_df_["action"].isin(actions_aug)].values.tolist()
 
     # Augment the drug (SMILES or Protein)
-    for row in random.sample(new_df_, int(len(new_rows) / 2)):
+    for row in random.sample(new_df_, int(len(new_rows))):
         if row[7] == "SMILES":
             for i in range(random.choice(list(range(2)))):
                 new_row = row.copy()
@@ -49,6 +49,7 @@ def main(args):
         else:
             new_rows.extend(preprocessing_utils.augment_aa_seq_num_and_create_rows(row[6], args.max_prot_change_ratio, num, row, tries))
 
+    print("Number of rows added:", len(new_rows))
     df = pd.concat([df, pd.DataFrame(new_rows, columns=df.columns)], ignore_index=True)
     df.to_csv(os.path.join(dirpath, "../data/drug-target-moa-aug.csv"), index=False)
 

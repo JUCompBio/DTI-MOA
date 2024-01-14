@@ -144,14 +144,14 @@ def augment_aa_seq_num_and_create_rows(aa, max_aa_change_ratio, num, row=None, m
     new_aa_set = set([aa])
     try_num = 0
     while len(new_aa_set) < num:
-        new_prot = augment_aa_seq(aa, max_aa_change_ratio)
-        if new_prot in new_aa_set:
+        new_aa = augment_aa_seq(aa, max_aa_change_ratio)
+        if new_aa in new_aa_set:
             try_num += 1
             if try_num > max_tries:
                 break
         else:
             try_num = 0
-            new_aa_set.add(new_prot)
+            new_aa_set.add(new_aa)
 
     new_aa_set.remove(aa)
     if isinstance(row, list) or isinstance(row, np.ndarray):
