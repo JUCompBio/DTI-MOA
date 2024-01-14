@@ -17,6 +17,10 @@ df["action"].replace(["inhibitory allosteric modulator", "negative modulator", "
 df["action"].replace(["partial antagonist"], "antagonist", inplace=True)
 df["action"].replace(["inverse agonist", "partial agonist"], "agonist", inplace=True)
 df["action"].replace(["activator", "stimulator", "potentiator"], "inducer", inplace=True)
+# Change the following drug smiles due to incompatibiliy with rdkit
+df["structure"].replace("[H][N]([H])([H])[Pt](Cl)(Cl)[N]([H])([H])[H]", "[NH3+]-[Pt-2](Cl)(Cl)[NH3+]", inplace=True)  ##DB000515
+df["structure"].replace("[H][N]([H])([H])[Pt]1(OC(=O)C2(CCC2)C(=O)O1)[N]([H])([H])[H]", "C1CC2(C1)C(=O)O[Pt-2]([NH3+])([NH3+])OC2=O", inplace=True)  # DB000958
+df["structure"].replace("[H][N]1([H])[C@@H]2CCCC[C@H]2[N]([H])([H])[Pt]11OC(=O)C(=O)O1", "O1C(=O)C(=O)O[Pt-2]12[NH2+]C0CCCCC0[NH2+]2", inplace=True)  # DB000526
 # Keep only important MOA that occur a substantial number of times
 df = df.loc[df["action"].isin(["inhibitor", "ligand", "substrate", "allosteric modulator", "antagonist", "agonist", "inducer"])]
 df = df[df["uniprotkb-id"] != "Q8WXI7"]  # Too long
@@ -83,9 +87,4 @@ output_map = {df.groupby(["action"]).size().index[k]: k for k in range(num_class
 df["output"] = [output_map[i] for i in df["action"]]
 print("Number of rows:", len(df))
 
-# Remove inhibitor to make a more balanced dataset
-l = df.loc[df["action"] == "inhibitor"].index.tolist()
-l_to_drop = random.sample(l, k=2000)
-df.loc[df.index.isin(l_to_drop)].to_csv(os.path.join(dirpath, "../data/dropped_inhibitor_moa.csv"), index=False)
-df = df.drop(labels=l_to_drop)
 df.to_csv(os.path.join(dirpath, "../data/drug-target-moa-mod.csv"), index=False)

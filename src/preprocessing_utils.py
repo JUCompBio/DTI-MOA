@@ -137,13 +137,14 @@ def augment_aa_seq(aa, max_aa_change_ratio):
     return "".join(new_prot)
 
 
-def augment_aa_seq_num_and_create_rows(aa, max_aa_change_ratio, num, row=None, max_tries=10):
+def augment_aa_seq_num_and_create_rows(row, idx: int, id_idx: int, max_aa_change_ratio, num, max_tries=10):
     """
     Repeatedly augment same aa seq num times
     """
+    aa = row[idx]
     new_aa_set = set([aa])
     try_num = 0
-    while len(new_aa_set) < num:
+    while len(new_aa_set) <= num:
         new_aa = augment_aa_seq(aa, max_aa_change_ratio)
         if new_aa in new_aa_set:
             try_num += 1
@@ -158,8 +159,8 @@ def augment_aa_seq_num_and_create_rows(aa, max_aa_change_ratio, num, row=None, m
         new_rows = []
         for i, aa in enumerate(new_aa_set):
             new_row = row.copy()
-            new_row[2] += f"_{i+1}"
-            new_row[-2] = aa
+            new_row[id_idx] += f"_{i+1}"
+            new_row[idx] = aa
             new_rows.append(new_row)
         return new_rows
     return new_aa_set
