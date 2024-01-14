@@ -58,7 +58,7 @@ def main(args):
             f = encode_and_save(prot_model, row["structure"], row["drugbank-id"], prot_enc_dir)
             mapping.append([row["drugbank-id"], row["structure"], f])
 
-    del prot_model
+        del prot_model
 
     if args.smiles:
         smiles_model = preprocessing_utils.MyFeatureExtractionPipeline(task="feature-extraction", model=AutoModel.from_pretrained(args.smiles_model), tokenizer=AutoTokenizer.from_pretrained(args.smiles_model), return_tensors=True, device=device)
@@ -71,4 +71,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1:])
