@@ -153,7 +153,7 @@ def augment_aa_seq_num_and_create_rows(aa, max_aa_change_ratio, num, row=None, m
             new_aa_set.add(new_prot)
 
     new_aa_set.remove(aa)
-    if row:
+    if isinstance(row, list):
         new_rows = []
         for i, aa in enumerate(new_aa_set):
             new_row = row.copy()
