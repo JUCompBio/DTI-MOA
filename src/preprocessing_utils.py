@@ -64,7 +64,7 @@ def perform_dssp(root_inp: str, root_out: str, pid: str):
     return f2
 
 
-def uniprot_to_dssp(uid):
+def uniprot_to_dssp(uid, try_pdb=False):
     """
     Function to get secondary structure information for a given uniprot ID (uid)
     """
@@ -76,14 +76,16 @@ def uniprot_to_dssp(uid):
         if os.path.exists(dssp_path) and parse_dssp(dssp_path):
             return dssp_path
     else:
-        print(f"Alphafold pdb for uid: {uid} not found. Trying RCSB database...")
-        for pdb_id in get_pdb_from_uid(uid):
-            pdb_path = download_pdb_pdb_file(pdb_id, os.path.join(dirpath, "../data/pdb/"))
-            if pdb_path:
-                dssp_path = perform_dssp(os.path.join(dirpath, "../data/pdb/"), os.path.join(dirpath, "../data/dssp/"), pdb_id)
-                if os.path.exists(dssp_path) and parse_dssp(dssp_path):
-                    return dssp_path
-        print(f"Uid: {uid} not found in RCSB database.")
+        print(f"Alphafold pdb for uid: {uid} not found.")
+        if try_pdb:
+            print("Trying RCSB database...")
+            for pdb_id in get_pdb_from_uid(uid):
+                pdb_path = download_pdb_pdb_file(pdb_id, os.path.join(dirpath, "../data/pdb/"))
+                if pdb_path:
+                    dssp_path = perform_dssp(os.path.join(dirpath, "../data/pdb/"), os.path.join(dirpath, "../data/dssp/"), pdb_id)
+                    if os.path.exists(dssp_path) and parse_dssp(dssp_path):
+                        return dssp_path
+            print(f"Uid: {uid} not found in RCSB database.")
 
 
 def get_uid_from_dbid(dbid):

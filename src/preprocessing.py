@@ -48,14 +48,14 @@ os.makedirs(os.path.join(dirpath, "../data/pdb"), exist_ok=True)
 os.makedirs(os.path.join(dirpath, "../data/dssp"), exist_ok=True)
 
 for uid in tqdm(uniprot_ids):
-    r = preprocessing_utils.uniprot_to_dssp(uid)
+    r = preprocessing_utils.uniprot_to_dssp(uid, try_pdb=False)
     mapping.append([None, uid, r])
 
 for dbid in tqdm(db_ids):
     uid = preprocessing_utils.get_uid_from_dbid(dbid)
     mapping.append([dbid, uid, preprocessing_utils.uniprot_to_dssp(uid)])
 
-pd.DataFrame(mapping, columns=["DrugBankID", "UniProtID", "path"]).to_csv(os.path.join(dirpath, "../data/mapping.csv"), index=False)
+pd.DataFrame(mapping, columns=["DrugBankID", "UniProtID", "path"]).to_csv(os.path.join(dirpath, "../data/dssp_mapping.csv"), index=False)
 
 # Add drug-target pairs that do not interact based on atc (New class "unknown" formed)
 atc_df = pd.read_csv(os.path.join(dirpath, "../data/drugs_atc.csv"))
