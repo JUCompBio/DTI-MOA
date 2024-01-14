@@ -44,20 +44,19 @@ for i, row in df_.iterrows():
 df = df_[df.columns]
 
 # Perform DSSP for all proteins
-uniprot_ids = df["uniprotkb-id"].unique().tolist()
-db_ids = df.loc[df["type"] == "polypeptide"]["drugbank-id"].unique().tolist()
+uniprot_ids = df[["uniprotkb-id", "aa-seq"]].unique().tolist()
+db_ids = df.loc[df["type"] == "polypeptide"][["drugbank-id", "structure"]].unique().tolist()
 mapping = []
 
 os.makedirs(os.path.join(dirpath, "../data/pdb"), exist_ok=True)
 os.makedirs(os.path.join(dirpath, "../data/dssp"), exist_ok=True)
 
-for uid in tqdm(uniprot_ids):
-    r = preprocessing_utils.uniprot_to_dssp(uid, try_pdb=False)
-    mapping.append([None, uid, r])
+for uid, seq in tqdm(uniprot_ids):
+    mapping.append([None, uid, preprocessing_utils.uniprot_to_dssp(uid, try_pdb=False), seq])
 
-for dbid in tqdm(db_ids):
+for dbid, seq in tqdm(db_ids):
     uid = preprocessing_utils.get_uid_from_dbid(dbid)
-    mapping.append([dbid, uid, preprocessing_utils.uniprot_to_dssp(uid)])
+    mapping.append([dbid, uid, preprocessing_utils.uniprot_to_dssp(uid), seq])
 
 pd.DataFrame(mapping, columns=["DrugBankID", "UniProtID", "path"]).to_csv(os.path.join(dirpath, "../data/dssp_mapping.csv"), index=False)
 
