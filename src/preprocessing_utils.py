@@ -4,6 +4,7 @@ import json
 import requests
 import urllib
 import random
+import numpy as np
 from rdkit import Chem
 import gzip
 import shutil
@@ -153,7 +154,7 @@ def augment_aa_seq_num_and_create_rows(aa, max_aa_change_ratio, num, row=None, m
             new_aa_set.add(new_prot)
 
     new_aa_set.remove(aa)
-    if isinstance(row, list):
+    if isinstance(row, list) or isinstance(row, np.ndarray):
         new_rows = []
         for i, aa in enumerate(new_aa_set):
             new_row = row.copy()
