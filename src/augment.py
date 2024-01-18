@@ -1,13 +1,79 @@
 import sys
 import argparse
 import os
+import json
 import pandas as pd
 import random
-import preprocessing_utils
+import numpy as np
+from rdkit import Chem
 
 seed = 42
 random.seed(seed)
 dirpath = os.path.dirname(__file__)
+
+
+def randomize_smiles(smiles):
+    """Perform a randomization of a SMILES string must be RDKit sanitizable"""
+    m = Chem.MolFromSmiles(smiles)
+    ans = list(range(m.GetNumAtoms()))
+    random.shuffle(ans)
+    nm = Chem.RenumberAtoms(m, ans)
+    return Chem.MolToSmiles(nm, canonical=False, isomericSmiles=True)
+
+
+def get_blosum_prot_list():
+    """
+    List of proteins that are similar to each other according to BLOSUM
+    """
+    with open(os.path.join(os.path.dirname(__file__), "../data/blosum.json"), "r") as f:
+        blosum = json.load(f)
+    blosum_prot_list = {}
+    for i in blosum:
+        blosum_prot_list[i] = []
+        for j in blosum[i]:
+            if blosum[i][j] > 0 and i != j:
+                blosum_prot_list[i].extend([j] * blosum[i][j])
+
+    return blosum_prot_list
+
+
+def augment_aa_seq(aa, max_aa_change_ratio):
+    blosum_prot_list = get_blosum_prot_list()
+    aa = list(aa)
+    new_prot = aa.copy()
+    for residue_idx in random.sample(list(range(len(aa))), random.choice(list(range(1, int(len(aa) * max_aa_change_ratio + 1) + 1)))):
+        if new_prot[residue_idx] in blosum_prot_list and len(blosum_prot_list[new_prot[residue_idx]]):
+            new_prot[residue_idx] = random.choice(blosum_prot_list[new_prot[residue_idx]])
+    return "".join(new_prot)
+
+
+def augment_aa_seq_num_and_create_rows(row, idx: int, id_idx: int, max_aa_change_ratio, num, max_tries=10):
+    """
+    Repeatedly augment same aa seq num times
+    """
+    aa = row[idx]
+    new_aa_set = set([aa])
+    try_num = 0
+    while len(new_aa_set) <= num:
+        new_aa = augment_aa_seq(aa, max_aa_change_ratio)
+        if new_aa in new_aa_set:
+            try_num += 1
+            if try_num > max_tries:
+                break
+        else:
+            try_num = 0
+            new_aa_set.add(new_aa)
+
+    new_aa_set.remove(aa)
+    if isinstance(row, list) or isinstance(row, np.ndarray):
+        new_rows = []
+        for i, aa in enumerate(new_aa_set):
+            new_row = row.copy()
+            new_row[id_idx] += f"_{i+1}"
+            new_row[idx] = aa
+            new_rows.append(new_row)
+        return new_rows
+    return new_aa_set
 
 
 def main(args):
@@ -39,7 +105,7 @@ def main(args):
         # For each row, use the given prot to make num new ones
         for num, row in zip(arr, df[df["action"] == action].values):
             if num > 0:
-                new_rows.extend(preprocessing_utils.augment_aa_seq_num_and_create_rows(row, -2, 2, args.max_prot_change_ratio, num, tries))
+                new_rows.extend(augment_aa_seq_num_and_create_rows(row, -2, 2, args.max_prot_change_ratio, num, tries))
 
     # Temp variable just to say the whole dataset again to augment for drugs
     new_df_ = pd.concat([df, pd.DataFrame(new_rows, columns=df.columns)], ignore_index=True)
@@ -50,11 +116,11 @@ def main(args):
         if row[7] == "SMILES":
             for i in range(random.choice([0, 1, 1, 2, 2])):
                 new_row = row.copy()
-                new_row[6] = preprocessing_utils.randomize_smiles(new_row[6])
+                new_row[6] = randomize_smiles(new_row[6])
                 new_row[0] += f"_{i}"
                 new_rows.append(new_row)
         else:
-            new_rows.extend(preprocessing_utils.augment_aa_seq_num_and_create_rows(row, 6, 0, args.max_prot_change_ratio, random.choice([0, 1, 1, 2, 2]), tries))
+            new_rows.extend(augment_aa_seq_num_and_create_rows(row, 6, 0, args.max_prot_change_ratio, random.choice([0, 1, 1, 2, 2]), tries))
 
     print("Number of rows added:", len(new_rows))
     df = pd.concat([df, pd.DataFrame(new_rows, columns=df.columns)], ignore_index=True)

@@ -4,20 +4,29 @@ import argparse
 import pandas as pd
 import torch
 from tqdm.auto import tqdm
-from transformers import AutoModel, AutoTokenizer
-import preprocessing_utils
+from transformers import AutoModel, AutoTokenizer, BertModel, BertTokenizer, T5EncoderModel, T5Tokenizer
+from transformers.pipelines.feature_extraction import FeatureExtractionPipeline
 
 dirpath = os.path.dirname(__file__)
 
 
-def encode_and_save(model, seq, seq_id, root, prot=True):
-    file_name = seq_id
-    if prot:
-        file_name += "_" + seq[:200]
-        seq = " ".join(list(prot))
+prot_model_dict = {
+    "bert": {"model": BertModel, "model_args": ["Rostlab/prot_bert"], "model_kwargs": {}, "tokenizer": BertTokenizer, "tokenizer_args": ["Rostlab/prot_bert"], "tokenizer_kwargs": {}},
+    "t5": {"model": T5EncoderModel, "model_args": ["Rostlab/prot_t5_xl_uniref50"], "model_kwargs": {}, "tokenizer": T5Tokenizer, "tokenizer_args": ["Rostlab/prot_t5_xl_uniref50"], "tokenizer_kwargs": {"do_lower_case": False}},
+    "esm2": {"model": AutoModel, "model_args": ["facebook/esm2_t33_650M_UR50D"], "model_kwargs": {}, "tokenizer": AutoTokenizer, "tokenizer_args": ["facebook/esm2_t33_650M_UR50D"], "tokenizer_kwargs": {}},
+}
 
-    torch.save(model(seq), os.path.join(root, f"{file_name}.pt"))
-    return f"{file_name}.pt"
+
+class MyFeatureExtractionPipeline(FeatureExtractionPipeline):
+    def preprocess(self, inputs):
+        model_inputs = self.tokenizer(inputs, add_special_tokens=False, padding=False, return_tensors=self.framework)
+        return model_inputs
+
+
+def encode_prot_and_save(pipeline, seq, filename, root):
+    seq = " ".join(list(seq))
+    output = pipeline(seq)
+    torch.save(output.detach().cpu(), os.path.join(root, filename + ".pt"))
 
 
 # Encode the targets and drugs
@@ -27,7 +36,7 @@ def main(args):
     parser.add_argument("--smiles", action="store_true", help="Encode SMILES")
     parser.add_argument("--aa", action="store_true", help="Encode Proteins")
     parser.add_argument("--smiles-model", type=str, help="Hugging-face model to encode SMILES")
-    parser.add_argument("--aa-model", type=str, help="Hugging-face model to encode Proteins")
+    parser.add_argument("--aa-model", type=str, choices=["bert", "t5", "esm2"], help="Hugging-face model to encode Proteins")
     parser.add_argument("--out-df-filename", type=str, default="encoder_mapping.csv", help="Save id-file mapping in a dataframe")
     args = parser.parse_args(args)
 
@@ -46,26 +55,24 @@ def main(args):
     os.makedirs(smiles_enc_dir, exist_ok=True)
 
     if args.aa:
-        prot_model = preprocessing_utils.MyFeatureExtractionPipeline(task="feature-extraction", model=AutoModel.from_pretrained(args.aa_model), tokenizer=AutoTokenizer.from_pretrained(args.aa_model), return_tensors=True, device=device)
+        config = prot_model_dict[args.aa_model]
+        prot_pipeline = MyFeatureExtractionPipeline(task="feature-extraction", model=config["model"](*config["model_args"], **config["model_kwargs"]), tokenizer=config["tokenizer"](*config["tokenizer_args"], **config["tokenizer_kwargs"]), return_tensors=True, device=device)
 
         df_ = df.drop_duplicates(subset=["uniprotkb-id", "aa-seq"])
         for _, row in tqdm(df_.iterrows(), total=len(df_)):
-            f = encode_and_save(prot_model, row["aa-seq"], row["uniprotkb-id"], prot_enc_dir)
-            mapping.append([row["uniprotkb-id"], row["aa-seq"], f])
+            encode_prot_and_save(prot_pipeline, " ".join(list(row["aa-seq"])), row["uniprotkb-id"], prot_enc_dir)
+            mapping.append([row["uniprotkb-id"], row["aa-seq"], row["uniprotkb-id"] + ".pt"])
 
         df_ = df.loc[df["type"] == "polypeptide"].drop_duplicates(subset=["drugbank-id", "structure"])
         for _, row in tqdm(df_.iterrows(), total=len(df_)):
-            f = encode_and_save(prot_model, row["structure"], row["drugbank-id"], prot_enc_dir)
-            mapping.append([row["drugbank-id"], row["structure"], f])
+            encode_prot_and_save(prot_pipeline, " ".join(list(row["structure"])), row["drugbank-id"], prot_enc_dir)
+            mapping.append([row["drugbank-id"], row["structure"], row["drugbank-id"] + ".pt"])
 
         del prot_model
 
     if args.smiles:
-        smiles_model = preprocessing_utils.MyFeatureExtractionPipeline(task="feature-extraction", model=AutoModel.from_pretrained(args.smiles_model), tokenizer=AutoTokenizer.from_pretrained(args.smiles_model), return_tensors=True, device=device)
-        df_ = df.loc[df["type"] == "SMILES"].drop_duplicates(subset=["drugbank-id", "structure"])
-        for _, row in tqdm(df_.iterrows(), total=len(df_)):
-            f = encode_and_save(smiles_model, row["structure"], row["drugbank-id"], smiles_enc_dir, False)
-            mapping.append([row["drugbank-id"], row["structure"], f])
+        # use MolCLR
+        pass
 
     pd.DataFrame(mapping, columns=["ID", "Seq", "filename"]).to_csv(os.path.join(dirpath, "../data", args.out_df_filename), index=False)
 
