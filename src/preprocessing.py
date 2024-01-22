@@ -81,10 +81,10 @@ def uniprot_to_dssp(uid, seq, try_pdb=False):
         if os.path.exists(dssp_path):
             r = parse_dssp_check(dssp_path, seq)
             if isinstance(r, bool) and r:
-                return os.path.basename(dssp_path), None
+                return os.path.splitext(os.path.basename(dssp_path))[0] + ".pt", None
             elif isinstance(r, str):
                 print(f"DSSP for uid: {uid} non-matching corresponding aa-seq.")
-                return os.path.basename(dssp_path), r
+                return os.path.splitext(os.path.basename(dssp_path))[0] + ".pt", r
             else:
                 print(f"DSSP for uid: {uid} could not be generated.")
         else:
@@ -98,7 +98,7 @@ def uniprot_to_dssp(uid, seq, try_pdb=False):
                 if pdb_path:
                     dssp_path = perform_dssp(os.path.join(dirpath, "../data/pdb/"), os.path.join(dirpath, "../data/dssp/"), pdb_id)
                     if os.path.exists(dssp_path) and parse_dssp_check(dssp_path, seq):
-                        return os.path.basename(dssp_path), None
+                        return os.path.splitext(os.path.basename(dssp_path))[0] + ".pt", None
             print(f"Uid: {uid} not found in RCSB database.")
     return None, None
 

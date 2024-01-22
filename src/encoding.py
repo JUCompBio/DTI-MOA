@@ -76,7 +76,7 @@ def main(args):
 
         # use GIN MolCLR
 
-    pd.DataFrame(mapping, columns=["ID", "Seq", "filename"]).to_csv(os.path.join(dirpath, "../data", args.out_df_filename), index=False)
+    pd.DataFrame(mapping, columns=["ID", "Model", "Seq", "filename"]).to_csv(os.path.join(dirpath, "../data", args.out_df_filename), index=False)
 
 
 if __name__ == "__main__":
