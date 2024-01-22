@@ -58,26 +58,24 @@ def main(args):
             df_ = df.drop_duplicates(subset=["uniprotkb-id", "aa-seq"])
             for _, row in tqdm(df_.iterrows(), total=len(df_)):
                 encode_and_save(pipeline, config["data_indices"], " ".join(list(row["aa-seq"])), row["uniprotkb-id"], enc_dir)
-                mapping.append([row["uniprotkb-id"], model, row["aa-seq"], row["uniprotkb-id"] + ".pt"])
+                mapping.append([row["uniprotkb-id"], row["aa-seq"], row["uniprotkb-id"] + ".pt"])
 
             df_ = df.loc[df["type"] == "polypeptide"].drop_duplicates(subset=["drugbank-id", "structure"])
             for _, row in tqdm(df_.iterrows(), total=len(df_)):
                 encode_and_save(pipeline, config["data_indices"], " ".join(list(row["structure"])), row["drugbank-id"], enc_dir)
-                mapping.append([row["drugbank-id"], model, row["structure"], row["drugbank-id"] + ".pt"])
+                mapping.append([row["drugbank-id"], row["structure"], row["drugbank-id"] + ".pt"])
 
         if config["type"] == "smiles":
             df_ = df.loc[df["type"] == "SMILES"].drop_duplicates(subset=["drugbank-id", "structure"])
             if config["lib"] == "hf":
                 for _, row in tqdm(df_.iterrows(), total=len(df_)):
                     encode_and_save(pipeline, config["data_indices"], sf.encoder(row["structure"]) if model == "selformer" else row["structure"], row["drugbank-id"], enc_dir, False)
-                    mapping.append([row["drugbank-id"], model, row["structure"], row["drugbank-id"] + ".pt"])
+                    mapping.append([row["drugbank-id"], row["structure"], row["drugbank-id"] + ".pt"])
 
         if config["lib"] == "hf":
             del pipeline
 
-        # use GIN MolCLR
-
-    pd.DataFrame(mapping, columns=["ID", "Model", "Seq", "filename"]).to_csv(os.path.join(dirpath, "../data", args.out_df_filename), index=False)
+        pd.DataFrame(mapping, columns=["ID", "Seq", "filename"]).to_csv(os.path.join(enc_dir, args.out_df_filename), index=False)
 
 
 if __name__ == "__main__":
