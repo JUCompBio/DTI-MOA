@@ -1,16 +1,19 @@
 import os
 from tqdm.auto import tqdm
+import numpy as np
 import pandas as pd
 import random
 import re
-import os
 import json
 import requests
 import urllib
-import random
 import gzip
 import shutil
 from DSSPparser import parseDSSP
+import torch
+
+second_struct_map = {"": 0, "B": 1, "E": 2, "G": 3, "H": 4, "I": 5, "S": 6, "T": 7}
+struct_details_map = {" ": 0, "3": 1, "4": 1, "5": 1, "S": 1, "+": 1, "-": 2, "<": 2, ">": 3, "X": 4}
 
 
 def download_alphafold_pdb_file(uid: str, root: str):
@@ -118,11 +121,56 @@ def parse_dssp_check(dssp_path, seq):
     try:
         dssp.parse()
         if "".join(dssp.aa) == seq:
-            return True
+            return dssp_parser_torch(dssp_path)
         else:
-            return "".join(dssp.aa)
-    except Exception:
+            if dssp_parser_torch(dssp_path):
+                return "".join(dssp.aa)
+            else:
+                print("Counld not parse DSSP to torch!")
+    except Exception as e:
+        print(e)
         return None
+
+
+def dssp_parser_torch(dssp_path):
+    parser = parseDSSP(dssp_path)
+    parser.parse()
+    pddict = parser.dictTodataframe()
+    pddict = pddict[pddict.columns[:-2]]
+    for ind in pddict.loc[pddict["aa"] == "!"].index:
+        pddict.drop(ind, axis=0, inplace=True)
+
+    pddict["chain"] = pddict.groupby("chain").ngroup()
+    pddict[["h_nho1", "h_nho1_"]] = pddict["h_nho1"].str.split(",", expand=True)
+    pddict[["h_ohn1", "h_ohn1_"]] = pddict["h_ohn1"].str.split(",", expand=True)
+    pddict[["h_nho2", "h_nho2_"]] = pddict["h_nho2"].str.split(",", expand=True)
+    pddict[["h_ohn2", "h_ohn2_"]] = pddict["h_ohn2"].str.split(",", expand=True)
+    pddict = pddict[["aa", "chain", "struct", "structdetails", "acc", "h_nho1", "h_nho1_", "h_ohn1", "h_ohn1_", "h_nho2", "h_nho2_", "h_ohn2", "h_ohn2_", "tco", "kappa", "alpha", "phi", "psi", "xca", "yca", "zca"]]
+    pddict["struct"] = np.array([second_struct_map[str.strip(i)] if str.strip(i) in second_struct_map else 0 for i in pddict["struct"]])[..., None].flatten()
+
+    for col in ["acc", "h_nho1", "h_nho1_", "h_ohn1", "h_ohn1_", "h_nho2", "h_nho2_", "h_ohn2", "h_ohn2_", "tco", "kappa", "alpha", "phi", "psi", "xca", "yca", "zca"]:
+        pddict[col] = list(map(float, pddict[col]))
+        if col in ["kappa", "alpha", "phi", "psi"]:
+            pddict[col] /= 360
+        elif col in ["xca", "yca", "zca"]:
+            pddict[col] /= 100
+        elif col in ["h_nho1", "h_ohn1", "h_nho2", "h_ohn2"]:
+            pddict[col] /= 400
+        elif col in ["h_nho1_", "h_ohn1_", "h_nho2_", "h_ohn2_"]:
+            pddict[col] /= 10
+        elif col in ["acc"]:
+            pddict[col] /= 1000
+
+    structdetails = pddict["structdetails"].str.split("", expand=True)[[*range(3, 8)]]
+    for col in structdetails:
+        pddict.insert(int(col), f"structdetails_{col}", [struct_details_map[i] for i in structdetails[col]])
+
+    pddict.drop("structdetails", axis=1, inplace=True)
+    pddict.drop("aa", axis=1, inplace=True)
+
+    torch.save(torch.tensor(pddict.values).to(torch.float32), os.path.splitext(dssp_path)[0] + ".pt")
+
+    return True
 
 
 if __name__ == "__main__":
