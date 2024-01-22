@@ -95,8 +95,9 @@ def uniprot_to_dssp(uid, seq, try_pdb=False):
                 if pdb_path:
                     dssp_path = perform_dssp(os.path.join(dirpath, "../data/pdb/"), os.path.join(dirpath, "../data/dssp/"), pdb_id)
                     if os.path.exists(dssp_path) and parse_dssp_check(dssp_path, seq):
-                        return os.path.basename(dssp_path)
+                        return os.path.basename(dssp_path), None
             print(f"Uid: {uid} not found in RCSB database.")
+    return None, None
 
 
 def get_uid_from_dbid(dbid):
@@ -174,11 +175,11 @@ if __name__ == "__main__":
 
     count_change = 0
     for uid in tqdm(uniprot_ids):
-        r, sdict = uniprot_to_dssp(uid, df.loc[df["uniprotkb-id"] == uid]["aa-seq"].unique()[0], try_pdb=False)  # PDB sequence mostly doesn't match with uniprot sequence (full length)
-        if isinstance(sdict, str):
-            df.replace(df.loc[df["uniprotkb-id"] == uid]["aa-seq"].unique()[0], r, inplace=True)
+        path, new_aa = uniprot_to_dssp(uid, df.loc[df["uniprotkb-id"] == uid]["aa-seq"].unique()[0], try_pdb=False)  # PDB sequence mostly doesn't match with uniprot sequence (full length)
+        if isinstance(new_aa, str):
+            df.replace(df.loc[df["uniprotkb-id"] == uid]["aa-seq"].unique()[0], new_aa, inplace=True)
             count_change += 1
-        mapping.append([None, uid, r])
+        mapping.append([None, uid, path])
 
     if count_change >= 1:
         print(f"DSSP didn't match with aa-seq {count_change} times. Changed the aa seq with that in dssp.")
@@ -197,11 +198,11 @@ if __name__ == "__main__":
 
     # drugbank-id has isoforms. Mark them. Uniprot doesn't.
     df_ = df.drop_duplicates(["drugbank-id", "structure"])[["drugbank-id", "structure"]]
-    sdict = {dbid: df_.loc[df["drugbank-id"] == dbid]["structure"].unique() for dbid in df_["drugbank-id"].unique()}
-    for dbid in sdict:
-        if len(sdict[dbid]) > 1:
+    new_aa = {dbid: df_.loc[df["drugbank-id"] == dbid]["structure"].unique() for dbid in df_["drugbank-id"].unique()}
+    for dbid in new_aa:
+        if len(new_aa[dbid]) > 1:
             df_ = df.loc[df["drugbank-id"] == dbid]
-            for i, aa in enumerate(sdict[dbid], 1):
+            for i, aa in enumerate(new_aa[dbid], 1):
                 idxs = df_.loc[df_["structure"] == aa].index
                 df.iloc[idxs, 0] += "-" + str(i)
 
