@@ -56,19 +56,19 @@ def main(args):
         if config["type"] == "prot":
             df_ = df.drop_duplicates(subset=["uniprotkb-id", "aa-seq"])
             for _, row in tqdm(df_.iterrows(), total=len(df_)):
-                encode_and_save(pipeline, config["model"]["data_indices"], " ".join(list(row["aa-seq"])), row["uniprotkb-id"], enc_dir)
+                encode_and_save(pipeline, config["data_indices"], " ".join(list(row["aa-seq"])), row["uniprotkb-id"], enc_dir)
                 mapping.append([row["uniprotkb-id"], model, row["aa-seq"], row["uniprotkb-id"] + ".pt"])
 
             df_ = df.loc[df["type"] == "polypeptide"].drop_duplicates(subset=["drugbank-id", "structure"])
             for _, row in tqdm(df_.iterrows(), total=len(df_)):
-                encode_and_save(pipeline, config["model"]["data_indices"], " ".join(list(row["structure"])), row["drugbank-id"], enc_dir)
+                encode_and_save(pipeline, config["data_indices"], " ".join(list(row["structure"])), row["drugbank-id"], enc_dir)
                 mapping.append([row["drugbank-id"], model, row["structure"], row["drugbank-id"] + ".pt"])
 
         if config["type"] == "smiles":
             df_ = df.loc[df["type"] == "SMILES"].drop_duplicates(subset=["drugbank-id", "structure"])
             if config["lib"] == "hf":
                 for _, row in tqdm(df_.iterrows(), total=len(df_)):
-                    encode_and_save(pipeline, config["model"]["data_indices"], sf.encoder(row["structure"]) if model == "selformer" else row["structure"], row["drugbank-id"], enc_dir)
+                    encode_and_save(pipeline, config["data_indices"], sf.encoder(row["structure"]) if model == "selformer" else row["structure"], row["drugbank-id"], enc_dir)
                     mapping.append([row["drugbank-id"], model, row["structure"], row["drugbank-id"] + ".pt"])
 
         if config["lib"] == "hf":
