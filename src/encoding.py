@@ -39,7 +39,7 @@ def main(args):
     parser.add_argument("--model", type=str, nargs="*", default=[], choices=list(model_dict.keys()) + ["all"], help="Hugging-face model(s) to encode Proteins/SMILES")
     parser.add_argument("--out-df-filename", type=str, default="encoder_mapping.csv", help="Save id-file mapping in a dataframe")
     args = parser.parse_args(args)
-    if args.model == "all":
+    if "all" in args.model:
         args.model = list(model_dict.keys())
 
     device = 0 if torch.cuda.is_available() else -1
