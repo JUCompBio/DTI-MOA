@@ -26,8 +26,9 @@ class MyFeatureExtractionPipeline(FeatureExtractionPipeline):
         return model_inputs
 
 
-def encode_and_save(pipeline, inds, seq, filename, root):
-    seq = " ".join(list(seq))
+def encode_and_save(pipeline, inds, seq, filename, root, prot=True):
+    if prot:
+        seq = " ".join(list(seq))
     output = pipeline(seq)
     torch.save(output.detach().cpu()[inds[0] : inds[1]], os.path.join(root, filename + ".pt"))
 
@@ -68,7 +69,7 @@ def main(args):
             df_ = df.loc[df["type"] == "SMILES"].drop_duplicates(subset=["drugbank-id", "structure"])
             if config["lib"] == "hf":
                 for _, row in tqdm(df_.iterrows(), total=len(df_)):
-                    encode_and_save(pipeline, config["data_indices"], sf.encoder(row["structure"]) if model == "selformer" else row["structure"], row["drugbank-id"], enc_dir)
+                    encode_and_save(pipeline, config["data_indices"], sf.encoder(row["structure"]) if model == "selformer" else row["structure"], row["drugbank-id"], enc_dir, False)
                     mapping.append([row["drugbank-id"], model, row["structure"], row["drugbank-id"] + ".pt"])
 
         if config["lib"] == "hf":
