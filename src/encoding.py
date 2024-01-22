@@ -12,11 +12,11 @@ dirpath = os.path.dirname(__file__)
 
 
 model_dict = {
-    "bert": {"model": BertModel, "model_args": ["Rostlab/prot_bert"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": BertTokenizer, "tokenizer_args": ["Rostlab/prot_bert"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "prot", "lib": "hf"},
-    "t5": {"model": T5EncoderModel.from_pretrained, "model_args": ["Rostlab/prot_t5_xl_uniref50"], "model_kwargs": {}, "tokenizer": T5Tokenizer, "tokenizer_args": ["Rostlab/prot_t5_xl_uniref50"], "tokenizer_kwargs": {"do_lower_case": False}, "data_indices": [0, -1], "type": "prot", "lib": "hf"},
-    "esm2": {"model": AutoModel, "model_args": ["facebook/esm2_t33_650M_UR50D"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer, "tokenizer_args": ["facebook/esm2_t33_650M_UR50D"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "prot", "lib": "hf"},
-    "selformer": {"model": AutoModel, "model_args": ["HUBioDataLab/SELFormer"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer, "tokenizer_args": ["HUBioDataLab/SELFormer"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "smiles", "lib": "hf"},
-    "chemberta": {"model": AutoModel, "model_args": ["seyonec/PubChem10M_SMILES_BPE_450k"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer, "tokenizer_args": ["seyonec/PubChem10M_SMILES_BPE_450k"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "smiles", "lib": "hf"},
+    "bert": {"model": BertModel.from_pretrained, "model_args": ["Rostlab/prot_bert"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": BertTokenizer.from_pretrained, "tokenizer_args": ["Rostlab/prot_bert"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "prot", "lib": "hf"},
+    "t5": {"model": T5EncoderModel.from_pretrained, "model_args": ["Rostlab/prot_t5_xl_uniref50"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": T5Tokenizer.from_pretrained, "tokenizer_args": ["Rostlab/prot_t5_xl_uniref50"], "tokenizer_kwargs": {"do_lower_case": False}, "data_indices": [0, -1], "type": "prot", "lib": "hf"},
+    "esm2": {"model": AutoModel.from_pretrained, "model_args": ["facebook/esm2_t33_650M_UR50D"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer.from_pretrained, "tokenizer_args": ["facebook/esm2_t33_650M_UR50D"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "prot", "lib": "hf"},
+    "selformer": {"model": AutoModel.from_pretrained, "model_args": ["HUBioDataLab/SELFormer"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer.from_pretrained, "tokenizer_args": ["HUBioDataLab/SELFormer"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "smiles", "lib": "hf"},
+    "chemberta": {"model": AutoModel.from_pretrained, "model_args": ["seyonec/PubChem10M_SMILES_BPE_450k"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer.from_pretrained, "tokenizer_args": ["seyonec/PubChem10M_SMILES_BPE_450k"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "smiles", "lib": "hf"},
 }
 
 
