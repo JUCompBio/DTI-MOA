@@ -5,7 +5,7 @@ import numpy as np
 
 
 def train_test_split(df, train_size, random_state=42):
-    np.random.set_state(random_state)
+    np.random.seed(random_state)
     i = int(train_size * df.shape[0])
     o = np.random.permutation(df.shape[0])
     df_train, df_test = np.split(np.take(df, o, axis=0), [i])
@@ -24,9 +24,11 @@ def final_moa_data(df_path, drug_encoding_map_file, target_encoding_map_file, ds
     dssp_df = pd.read_csv(dssp_map_file)
     drug_enc = pd.read_csv(drug_encoding_map_file)
     target_enc = pd.read_csv(target_encoding_map_file)
+    df_ = df.copy()
+    df_.reset_index(drop=True)
 
     dssp_df.rename({"path": "TargetDSSPFile"}, axis=1, inplace=True)
-    df_ = pd.merge(df, dssp_df[["uniprotkb-id", "TargetDSSPFile"]], "left", "uniprotkb-id")
+    df_["TargetDSSPFile"] = pd.merge(df_["uniprotkb-id"].str.split("_").str[0], dssp_df[["uniprotkb-id", "TargetDSSPFile"]], "left", "uniprotkb-id")["TargetDSSPFile"].values
     df_.drop_duplicates(inplace=True)
 
     drug_enc.rename({"ID": "drugbank-id", "filename": "DrugEncodingFile"}, axis=1, inplace=True)
@@ -43,9 +45,10 @@ def final_moa_data(df_path, drug_encoding_map_file, target_encoding_map_file, ds
     df_.reset_index(drop=True, inplace=True)
     df_.to_csv(os.path.join(output_dir, "drug-target-moa-final.csv"), index=False)
 
-    train_df, test_df = train_test_split(df_, train_size=max(min(train_split, 1), 0), random_state=random_state)
-    train_df.to_csv(os.path.join(output_dir, "drug-target-moa-final-train.csv"), index=False)
-    test_df.to_csv(os.path.join(output_dir, "drug-target-moa-final-test.csv"), index=False)
+    if train_split < 1.0:
+        train_df, test_df = train_test_split(df_, train_size=max(min(train_split, 1), 0), random_state=random_state)
+        train_df.to_csv(os.path.join(output_dir, "drug-target-moa-final-train.csv"), index=False)
+        test_df.to_csv(os.path.join(output_dir, "drug-target-moa-final-test.csv"), index=False)
 
 
 if __name__ == "__main__":
