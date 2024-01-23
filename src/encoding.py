@@ -2,7 +2,6 @@ import sys
 import os
 import argparse
 import pandas as pd
-import selfies as sf
 import torch
 from tqdm.auto import tqdm
 from transformers import AutoModel, AutoTokenizer, BertModel, BertTokenizer, T5EncoderModel, T5Tokenizer
@@ -15,7 +14,7 @@ model_dict = {
     "bert": {"model": BertModel.from_pretrained, "model_args": ["Rostlab/prot_bert"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": BertTokenizer.from_pretrained, "tokenizer_args": ["Rostlab/prot_bert"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "prot", "lib": "hf"},
     "t5": {"model": T5EncoderModel.from_pretrained, "model_args": ["Rostlab/prot_t5_xl_uniref50"], "model_kwargs": {}, "tokenizer": T5Tokenizer.from_pretrained, "tokenizer_args": ["Rostlab/prot_t5_xl_uniref50"], "tokenizer_kwargs": {"do_lower_case": False}, "data_indices": [0, -1], "type": "prot", "lib": "hf"},
     "esm2": {"model": AutoModel.from_pretrained, "model_args": ["facebook/esm2_t33_650M_UR50D"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer.from_pretrained, "tokenizer_args": ["facebook/esm2_t33_650M_UR50D"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "prot", "lib": "hf"},
-    "selformer": {"model": AutoModel.from_pretrained, "model_args": ["HUBioDataLab/SELFormer"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer.from_pretrained, "tokenizer_args": ["HUBioDataLab/SELFormer"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "smiles", "lib": "hf"},
+    "molformer": {"model": AutoModel.from_pretrained, "model_args": ["ibm/MoLFormer-XL-both-10pct"], "model_kwargs": {"add_pooling_layer": False, "deterministic_eval": True, "trust_remote_code": True}, "tokenizer": AutoTokenizer.from_pretrained, "tokenizer_args": ["ibm/MoLFormer-XL-both-10pct"], "tokenizer_kwargs": {"trust_remote_code": True}, "data_indices": [1, -1], "type": "smiles", "lib": "hf"},
     "chemberta": {"model": AutoModel.from_pretrained, "model_args": ["seyonec/PubChem10M_SMILES_BPE_450k"], "model_kwargs": {"add_pooling_layer": False}, "tokenizer": AutoTokenizer.from_pretrained, "tokenizer_args": ["seyonec/PubChem10M_SMILES_BPE_450k"], "tokenizer_kwargs": {}, "data_indices": [1, -1], "type": "smiles", "lib": "hf"},
 }
 
@@ -29,7 +28,7 @@ class MyFeatureExtractionPipeline(FeatureExtractionPipeline):
 def encode_and_save(pipeline, inds, seq, filename, root, prot=True):
     if prot:
         seq = " ".join(list(seq))
-    output = pipeline(seq)
+    output = pipeline(seq)[0]
     torch.save(output.detach().cpu()[inds[0] : inds[1]], os.path.join(root, filename + ".pt"))
 
 
@@ -69,7 +68,7 @@ def main(args):
             df_ = df.loc[df["type"] == "SMILES"].drop_duplicates(subset=["drugbank-id", "structure"])
             if config["lib"] == "hf":
                 for _, row in tqdm(df_.iterrows(), total=len(df_)):
-                    encode_and_save(pipeline, config["data_indices"], sf.encoder(row["structure"]) if model == "selformer" else row["structure"], row["drugbank-id"], enc_dir, False)
+                    encode_and_save(pipeline, config["data_indices"], row["structure"], row["drugbank-id"], enc_dir, False)
                     mapping.append([row["drugbank-id"], row["structure"], row["drugbank-id"] + ".pt"])
 
         if config["lib"] == "hf":
