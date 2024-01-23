@@ -137,8 +137,6 @@ def dssp_parser_torch(dssp_path):
     parser.parse()
     pddict = parser.dictTodataframe()
     pddict = pddict[pddict.columns[:-2]]
-    for ind in pddict.loc[pddict["aa"] == "!"].index:
-        pddict.drop(ind, axis=0, inplace=True)
 
     pddict["chain"] = pddict.groupby("chain").ngroup()
     pddict[["h_nho1", "h_nho1_"]] = pddict["h_nho1"].str.split(",", expand=True)
