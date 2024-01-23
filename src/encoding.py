@@ -44,12 +44,12 @@ def main(args):
 
     device = 0 if torch.cuda.is_available() else -1
     df = pd.read_csv(args.df_path)
-    mapping = []  # columns - id (protein/drug), model_id, sequence, file path
 
     for model in args.model:
         config = model_dict[model]
         enc_dir = os.path.join(dirpath, f"../data/{config['type']}/", model)
         os.makedirs(enc_dir, exist_ok=True)
+        mapping = []  # columns - id (protein/drug), model_id, sequence, file path
         if config["lib"] == "hf":
             pipeline = MyFeatureExtractionPipeline(task="feature-extraction", model=config["model"](*config["model_args"], **config["model_kwargs"]), tokenizer=config["tokenizer"](*config["tokenizer_args"], **config["tokenizer_kwargs"]), return_tensors=True, device=device)
 
