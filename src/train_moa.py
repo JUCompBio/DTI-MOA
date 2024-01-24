@@ -45,7 +45,7 @@ def main(args):
                 optimizer.step()
                 total_loss += loss.item()
                 for metric in metrics:
-                    metric.update(torch.softmax(outputs, -1), labels)
+                    metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
             except Exception as e:
                 print(e)
 
@@ -69,7 +69,7 @@ def main(args):
                     loss = criterion(outputs, labels)
                     total_loss += loss.item()
                     for metric in metrics:
-                        metric.update(torch.softmax(outputs, -1), labels)
+                        metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
                 except Exception as e:
                     print(e)
 
