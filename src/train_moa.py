@@ -17,7 +17,7 @@ def main(args):
     train_loader = DataLoader(train_dataset, args.batch_size, shuffle=True, num_workers=args.num_workers, collate_fn=collate_fn)
     test_loader = DataLoader(test_dataset, args.batch_size, shuffle=False, num_workers=args.num_workers, collate_fn=collate_fn)
 
-    model = DTI_MOA_Model(args.num_classes, args.drug_enc_dim, args.drug_graph_dim, args.drug_avg_len, args.target_enc_dim, args.target_dssp_dim, args.target_avg_len)
+    model = DTI_MOA_Model(args.num_classes, args.drug_enc_dim, args.drug_graph_dim, args.drug_avg_len, args.target_enc_dim, args.target_dssp_dim, args.target_avg_len).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     metrics = [torchmetrics.classification.MulticlassAccuracy(args.num_classes).to(device), torchmetrics.classification.MulticlassRecall(args.num_classes).to(device), torchmetrics.classification.MulticlassPrecision(args.num_classes).to(device), torchmetrics.classification.MulticlassF1Score(args.num_classes).to(device)]
