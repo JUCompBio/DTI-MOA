@@ -66,7 +66,7 @@ def mol_to_graph_data_obj_simple(mol):
 
 
 class MOADataset(Dataset):
-    def __init__(self, df, smiles_encoding_root, prot_encoding_root, dssp_root, num_classes=8):
+    def __init__(self, df, smiles_encoding_root, gnn_encoding_root, prot_encoding_root, dssp_root, num_classes=8):
         """
         df: Dataframe containing the following columns -
         DrugID (str), Drug (str), DrugEncodingFile (str), TargetID (str), Target (str: Optional), TargetEncodingFile (str), TargetDSSPFile (str), Y (int/float)
@@ -74,6 +74,7 @@ class MOADataset(Dataset):
         super().__init__()
         self.df = df
         self.smiles_encoding_root = smiles_encoding_root
+        self.gnn_encoding_root = gnn_encoding_root
         self.prot_encoding_root = prot_encoding_root
         self.dssp_root = dssp_root
         self.num_classes = num_classes
@@ -86,17 +87,8 @@ class MOADataset(Dataset):
         target_enc = torch.load(os.path.join(self.prot_encoding_root, row["TargetEncodingFile"]), "cpu").to(torch.float32)
         target_dssp = torch.load(os.path.join(self.dssp_root, row["TargetDSSPFile"]), "cpu").to(torch.float32)
         drug_enc = torch.load(os.path.join(self.smiles_encoding_root, row["DrugEncodingFile"]), "cpu").to(torch.float32)
-        drug_graph = mol_to_graph_data_obj_simple(AllChem.MolFromSmiles(row["Drug"]))
+        drug_graph = torch.load(os.path.join(self.gnn_encoding_root, row["DrugEncodingFile"]), "cpu").to(torch.float32)
         y = torch.tensor(row["Y"], dtype=torch.float32)
         if self.num_classes > 2:
             y = F.one_hot(y.to(torch.int64), self.num_classes).to(torch.float32)
-        return (target_enc, target_dssp, drug_enc, drug_graph), y
-
-
-def collate_fn(batch):
-    x = []
-    y = []
-    for i1, i2 in batch:
-        x.append(i1)
-        y.append(i2)
-    return list(zip(*x)), torch.stack(y)
+        return target_enc, target_dssp, drug_enc, drug_graph, y

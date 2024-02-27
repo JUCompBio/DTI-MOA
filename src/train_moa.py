@@ -5,8 +5,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import torchmetrics
-from model import DTI_MOA_Model
-from data_utils import MOADataset, collate_fn
+from model import DTI_MOA_Model, GNN
+from data_utils import MOADataset
 from tqdm import tqdm
 
 
@@ -14,14 +14,14 @@ def main(args):
     device = torch.device(args.device)
     train_dataset = MOADataset(pd.read_csv(args.train_df_path), args.smiles_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
     test_dataset = MOADataset(pd.read_csv(args.test_df_path), args.smiles_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
-    train_loader = DataLoader(train_dataset, args.batch_size, shuffle=True, num_workers=args.num_workers, collate_fn=collate_fn)
-    test_loader = DataLoader(test_dataset, args.batch_size, shuffle=False, num_workers=args.num_workers, collate_fn=collate_fn)
+    train_loader = DataLoader(train_dataset, args.batch_size, shuffle=True, num_workers=args.num_workers)
+    test_loader = DataLoader(test_dataset, args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     model = DTI_MOA_Model(args.num_classes, args.drug_enc_dim, args.drug_graph_dim, args.drug_avg_len, args.target_enc_dim, args.target_dssp_dim, args.target_avg_len).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     metrics = [torchmetrics.classification.MulticlassAccuracy(args.num_classes).to(device), torchmetrics.classification.MulticlassRecall(args.num_classes).to(device), torchmetrics.classification.MulticlassPrecision(args.num_classes).to(device), torchmetrics.classification.MulticlassF1Score(args.num_classes).to(device)]
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.8)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.93)
 
     max_acc = 0
     max_tries = 10
@@ -31,23 +31,20 @@ def main(args):
         model.train()
         print(f"Epoch: {epoch}/{args.epochs}")
         total_loss = 0
-        for [target_enc, target_dssp, drug_enc, drug_graph], labels in tqdm(train_loader):
+        for target_enc, target_dssp, drug_enc, drug_graph, labels in tqdm(train_loader):
             optimizer.zero_grad()
-            target_enc = [x.to(device) for x in target_enc]
-            target_dssp = [x.to(device) for x in target_dssp]
-            drug_enc = [x.to(device) for x in drug_enc]
-            drug_graph = [x.to(device) for x in drug_graph]
+            target_enc = target_enc.to(device)
+            target_dssp = target_dssp.to(device)
+            drug_enc = drug_enc.to(device)
+            drug_graph = drug_graph.to(device)
             labels = labels.to(device)
-            try:
-                outputs = model(drug_enc, drug_graph, target_enc, target_dssp)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item()
-                for metric in metrics:
-                    metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
-            except Exception as e:
-                print(e)
+            outputs = model(drug_enc, drug_graph, target_enc, target_dssp)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+            for metric in metrics:
+                metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
 
         print("Train Loss:", total_loss)
         for metric in metrics:
@@ -58,20 +55,17 @@ def main(args):
         model.eval()
         total_loss = 0
         with torch.no_grad():
-            for [target_enc, target_dssp, drug_enc, drug_graph], labels in tqdm(test_loader):
-                target_enc = [x.to(device) for x in target_enc]
-                target_dssp = [x.to(device) for x in target_dssp]
-                drug_enc = [x.to(device) for x in drug_enc]
-                drug_graph = [x.to(device) for x in drug_graph]
+            for target_enc, target_dssp, drug_enc, drug_graph, labels in tqdm(test_loader):
+                target_enc = target_enc.to(device)
+                target_dssp = target_dssp.to(device)
+                drug_enc = drug_enc.to(device)
+                drug_graph = drug_graph.to(device)
                 labels = labels.to(device)
-                try:
-                    outputs = model(drug_enc, drug_graph, target_enc, target_dssp)
-                    loss = criterion(outputs, labels)
-                    total_loss += loss.item()
-                    for metric in metrics:
-                        metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
-                except Exception as e:
-                    print(e)
+                outputs = model(drug_enc, drug_graph, target_enc, target_dssp)
+                loss = criterion(outputs, labels)
+                total_loss += loss.item()
+                for metric in metrics:
+                    metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
 
         print("Test Loss:", total_loss)
         for metric in metrics:

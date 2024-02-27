@@ -252,46 +252,55 @@ class DTI_MOA_Model(nn.Module):
         super().__init__()
         self._dim = 512
         self.linear1_1 = FFLayer(drug_enc_dim, self._dim)
-        self.linear1_2 = nn.Sequential(GNN(), FFLayer(drug_graph_dim, drug_graph_dim))
+        self.linear1_2 = FFLayer(drug_graph_dim, drug_graph_dim)
         self.linear1_3 = FFLayer(target_enc_dim, self._dim)
-        self.linear1_4 = FFLayer(target_dssp_dim, target_dssp_dim)
-        self.pool1_1 = nn.AdaptiveAvgPool1d(drug_avg_len)
-        self.pool1_2 = nn.AdaptiveAvgPool1d(target_avg_len)
-        self.linear2_1 = FFLayer(self._dim, self._dim)
-        self.linear2_2 = FFLayer(drug_graph_dim, drug_graph_dim)
-        self.linear2_3 = FFLayer(self._dim, self._dim)
-        self.linear2_4 = FFLayer(target_dssp_dim, target_dssp_dim)
-        self.linear3_1 = FFLayer(self._dim + drug_graph_dim, self._dim)
-        self.linear3_2 = FFLayer(self._dim + target_dssp_dim, self._dim)
-        self.attn1 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
-        self.attn2 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
-        self.pool2 = nn.AdaptiveAvgPool2d((drug_avg_len, self._dim))
+        self.linear1_4 = Transformer(target_dssp_dim, 1, 8, 64, target_dssp_dim)
+        self.linear2_1 = FFLayer(self._dim + drug_graph_dim, self._dim)
+        self.linear2_2 = FFLayer(self._dim + target_dssp_dim, self._dim)
+        # WRX-Attn
+        self.smiles_attn1 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.smiles_alpha1 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
+        self.prot_attn1 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.prot_alpha1 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
+        self.smiles_attn2 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.smiles_alpha2 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
+        self.prot_attn2 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.prot_alpha2 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
+        self.prot_pool = nn.AdaptiveAvgPool2d((drug_avg_len, self._dim))
+        self.linear3 = FFLayer(self._dim, self._dim)
         self.linear4 = FFLayer(self._dim, self._dim)
-        self.mlt = MultiLayerTransformer(self._dim, 2 * drug_avg_len, self._dim, 4, 8, self._dim)
+        self.mlt = MultiLayerTransformer(self._dim, 2 * drug_avg_len, self._dim, 2, 8, self._dim)
+        self.beta = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
         self.linear5 = FFLayer(self._dim, self._dim)
-        self.linear6 = nn.Linear(self._dim, num_classes)
+        self.linear6 = nn.Linear(self._dim, num_classes if num_classes > 2 else 1)
 
     def forward(self, x1, x2, x3, x4):
         """
         Input: Drug Enc, Drug Graph, Target Enc, Target DSSP
         """
-        x1 = torch.stack([self.pool1_1(self.linear1_1(x).T).T for x in x1])
-        x2 = torch.stack([self.pool1_1(self.linear1_2(x).T).T for x in x2])
-        x3 = torch.stack([self.pool1_2(self.linear1_3(x).T).T for x in x3])
-        x4 = torch.stack([self.pool1_2(self.linear1_4(x).T).T for x in x4])
-        x1 = self.linear2_1(x1)
-        x2 = self.linear2_2(x2)
-        x3 = self.linear2_3(x3)
-        x4 = self.linear2_4(x4)
+        x1 = self.linear1_1(x1)
+        x2 = self.linear1_2(x2)
+        x3 = self.linear1_3(x3)
+        x4 = self.linear1_4(x4)
         x1 = torch.cat([x1, x2], dim=-1)
         x2 = torch.cat([x3, x4], dim=-1)
-        x1 = self.linear3_1(x1)
-        x2 = self.linear3_2(x2)
-        x3 = self.attn1(x1, x2, x2)[0]
-        x2 = self.attn2(x2, x1, x1)[0]
-        x2 = self.pool2(x2)
-        x2 = self.linear4(x2)
-        x = torch.concat([x3, x2], dim=1)
+        x1 = self.linear2_1(x1)
+        x2 = self.linear2_2(x2)
+
+        x3 = self.smiles_attn1(x1, x2, x2)[0]
+        x3 = (x3 + self.smiles_alpha1 * x1) / (1 + self.smiles_alpha1)
+        x4 = self.prot_attn1(x2, x1, x1)[0]
+        x4 = (x4 + self.prot_alpha1 * x2) / (1 + self.prot_alpha1)
+
+        x1 = self.smiles_attn2(x3, x4, x4)[0]
+        x1 = (x1 + self.smiles_alpha2 * x3) / (1 + self.smiles_alpha2)
+        x2 = self.prot_attn2(x4, x3, x3)[0]
+        x2 = (x2 + self.prot_alpha2 * x4) / (1 + self.prot_alpha2)
+
+        x2 = self.prot_pool(x2)
+        x2 = self.linear3(x2)
+        x = torch.concat([x1, x2], dim=1)
+        x = self.linear4(x)
         x = self.mlt(x)
         x = self.linear5(x)
         x = self.linear6(x)
