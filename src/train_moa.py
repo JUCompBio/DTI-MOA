@@ -12,8 +12,8 @@ from tqdm import tqdm
 
 def main(args):
     device = torch.device(args.device)
-    train_dataset = MOADataset(pd.read_csv(args.train_df_path), args.smiles_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
-    test_dataset = MOADataset(pd.read_csv(args.test_df_path), args.smiles_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
+    train_dataset = MOADataset(pd.read_csv(args.train_df_path), args.smiles_encoding_root, args.gnn_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
+    test_dataset = MOADataset(pd.read_csv(args.test_df_path), args.smiles_encoding_root, args.gnn_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
     train_loader = DataLoader(train_dataset, args.batch_size, shuffle=True, num_workers=args.num_workers)
     test_loader = DataLoader(test_dataset, args.batch_size, shuffle=False, num_workers=args.num_workers)
 
@@ -94,6 +94,7 @@ if __name__ == "__main__":
     parser.add_argument("--train-df-path", type=str, required=True, help="Path to final moa csv")
     parser.add_argument("--test-df-path", type=str, required=True, help="Path to final moa csv")
     parser.add_argument("--smiles-encoding-root", type=str, required=True)
+    parser.add_argument("--gnn_encoding_root", type=str, required=True)
     parser.add_argument("--prot-encoding-root", type=str, required=True)
     parser.add_argument("--dssp-root", type=str, required=True)
     parser.add_argument("--drug-enc-dim", type=int, required=True)
