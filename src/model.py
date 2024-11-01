@@ -18,10 +18,44 @@ class PreNorm(nn.Module):
         return self.fn(self.norm(x), **kwargs)
 
 
+class PreNorm_KQV(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.norm2 = nn.LayerNorm(dim)
+        self.norm3 = nn.LayerNorm(dim)
+        self.fn = fn
+
+    def forward(self, q, k, v, **kwargs):
+        return self.fn(self.norm1(q), self.norm2(k), self.norm3(v), **kwargs)
+
+
+class PostNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.fn = fn
+
+    def forward(self, x):
+        return self.norm(self.fn(x))
+
+
+class PostNorm_(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.fn = fn
+
+    def forward(self, q, k, v, **kwargs):
+        return self.norm(self.fn(q, k, v, **kwargs)[0])
+
+
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
-        self.net = nn.Sequential(nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout))
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout)
+        )
 
     def forward(self, x):
         return self.net(x)
@@ -55,7 +89,14 @@ class Transformer(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([PreNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)), PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))]))
+            self.layers.append(
+                nn.ModuleList(
+                    [
+                        PreNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),
+                        PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout)),
+                    ]
+                )
+            )
 
     def forward(self, x):
         for attn, ff in self.layers:
@@ -258,13 +299,17 @@ class DTI_MOA_Model(nn.Module):
         self.linear2_1 = FFLayer(self._dim + drug_graph_dim, self._dim)
         self.linear2_2 = FFLayer(self._dim + target_dssp_dim, self._dim)
         # WRX-Attn
-        self.smiles_attn1 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.smiles_attn1 = PreNorm_KQV(self._dim, nn.MultiheadAttention(self._dim, 8, batch_first=True))
+        self.smiles_attn1_ln = PreNorm(self._dim, FeedForward(self._dim, self._dim))
         self.smiles_alpha1 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
-        self.prot_attn1 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.prot_attn1 = PreNorm_KQV(self._dim, nn.MultiheadAttention(self._dim, 8, batch_first=True))
+        self.prot_attn1_ln = PreNorm(self._dim, FeedForward(self._dim, self._dim))
         self.prot_alpha1 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
-        self.smiles_attn2 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.smiles_attn2 = PreNorm_KQV(self._dim, nn.MultiheadAttention(self._dim, 8, batch_first=True))
+        self.smiles_attn2_ln = PreNorm(self._dim, FeedForward(self._dim, self._dim))
         self.smiles_alpha2 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
-        self.prot_attn2 = nn.MultiheadAttention(self._dim, 8, batch_first=True)
+        self.prot_attn2 = PreNorm_KQV(self._dim, nn.MultiheadAttention(self._dim, 8, batch_first=True))
+        self.prot_attn2_ln = PreNorm(self._dim, FeedForward(self._dim, self._dim))
         self.prot_alpha2 = nn.Parameter(torch.tensor(1, dtype=torch.float32), requires_grad=True)
         self.prot_pool = nn.AdaptiveAvgPool2d((drug_avg_len, self._dim))
         self.linear3 = FFLayer(self._dim, self._dim)
@@ -287,19 +332,19 @@ class DTI_MOA_Model(nn.Module):
         x1 = self.linear2_1(x1)
         x2 = self.linear2_2(x2)
 
-        x3 = self.smiles_attn1(x1, x2, x2)[0]
-        x3 = (x3 + self.smiles_alpha1 * x1) / (1 + self.smiles_alpha1)
-        x4 = self.prot_attn1(x2, x1, x1)[0]
-        x4 = (x4 + self.prot_alpha1 * x2) / (1 + self.prot_alpha1)
+        x3 = self.smiles_attn1(x1, x2, x2)[0] + self.smiles_alpha1 * x1
+        x3 = self.smiles_attn1_ln(x3) + x3
+        x4 = self.prot_attn1(x2, x1, x1)[0] + self.prot_alpha1 * x2
+        x4 = self.prot_attn1_ln(x4) + x4
 
-        x1 = self.smiles_attn2(x3, x4, x4)[0]
-        x1 = (x1 + self.smiles_alpha2 * x3) / (1 + self.smiles_alpha2)
-        x2 = self.prot_attn2(x4, x3, x3)[0]
-        x2 = (x2 + self.prot_alpha2 * x4) / (1 + self.prot_alpha2)
-
+        x1 = self.smiles_attn2(x3, x4, x4)[0] + self.smiles_alpha2 * x3
+        x1 = self.smiles_attn2_ln(x1) + x1
+        x2 = self.prot_attn2(x4, x3, x3)[0] + self.prot_alpha2 * x4
+        x4 = self.prot_attn2_ln(x4) + x4
         x2 = self.prot_pool(x2)
         x2 = self.linear3(x2)
         x = torch.concat([x1, x2], dim=1)
+
         x = self.linear4(x)
         x = self.mlt(x)
         x = self.linear5(x)

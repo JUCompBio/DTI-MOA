@@ -1,26 +1,52 @@
-import os
 import argparse
 import pandas as pd
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import torchmetrics
-from model import DTI_MOA_Model, GNN
+from model import DTI_MOA_Model
 from data_utils import MOADataset
 from tqdm import tqdm
 
 
 def main(args):
     device = torch.device(args.device)
-    train_dataset = MOADataset(pd.read_csv(args.train_df_path), args.smiles_encoding_root, args.gnn_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
-    test_dataset = MOADataset(pd.read_csv(args.test_df_path), args.smiles_encoding_root, args.gnn_encoding_root, args.prot_encoding_root, args.dssp_root, args.num_classes)
+    train_dataset = MOADataset(
+        pd.read_csv(args.train_df_path),
+        args.smiles_encoding_root,
+        args.gnn_encoding_root,
+        args.prot_encoding_root,
+        args.dssp_root,
+        args.num_classes,
+    )
+    test_dataset = MOADataset(
+        pd.read_csv(args.test_df_path),
+        args.smiles_encoding_root,
+        args.gnn_encoding_root,
+        args.prot_encoding_root,
+        args.dssp_root,
+        args.num_classes,
+    )
     train_loader = DataLoader(train_dataset, args.batch_size, shuffle=True, num_workers=args.num_workers)
     test_loader = DataLoader(test_dataset, args.batch_size, shuffle=False, num_workers=args.num_workers)
 
-    model = DTI_MOA_Model(args.num_classes, args.drug_enc_dim, args.drug_graph_dim, args.drug_avg_len, args.target_enc_dim, args.target_dssp_dim, args.target_avg_len).to(device)
-    criterion = nn.CrossEntropyLoss()
+    model = DTI_MOA_Model(
+        args.num_classes,
+        args.drug_enc_dim,
+        args.drug_graph_dim,
+        args.drug_avg_len,
+        args.target_enc_dim,
+        args.target_dssp_dim,
+        args.target_avg_len,
+    ).to(device)
+    criterion = nn.CrossEntropyLoss() if args.num_classes > 2 else nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-    metrics = [torchmetrics.classification.MulticlassAccuracy(args.num_classes).to(device), torchmetrics.classification.MulticlassRecall(args.num_classes).to(device), torchmetrics.classification.MulticlassPrecision(args.num_classes).to(device), torchmetrics.classification.MulticlassF1Score(args.num_classes).to(device)]
+    metrics = [
+        torchmetrics.classification.Accuracy(task="multiclass" if args.num_classes > 2 else "binary", num_classes=args.num_classes).to(device),
+        torchmetrics.classification.Recall(task="multiclass" if args.num_classes > 2 else "binary", num_classes=args.num_classes).to(device),
+        torchmetrics.classification.Precision(task="multiclass" if args.num_classes > 2 else "binary", num_classes=args.num_classes).to(device),
+        torchmetrics.classification.F1Score(task="multiclass" if args.num_classes > 2 else "binary", num_classes=args.num_classes).to(device),
+    ]
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.93)
 
     max_acc = 0
@@ -44,7 +70,10 @@ def main(args):
             optimizer.step()
             total_loss += loss.item()
             for metric in metrics:
-                metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
+                if args.num_classes > 2:
+                    metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
+                else:
+                    metric.update(torch.sigmoid(outputs), labels)
 
         print("Train Loss:", total_loss)
         for metric in metrics:
@@ -65,7 +94,10 @@ def main(args):
                 loss = criterion(outputs, labels)
                 total_loss += loss.item()
                 for metric in metrics:
-                    metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
+                    if args.num_classes > 2:
+                        metric.update(torch.softmax(outputs, -1), torch.argmax(labels, dim=-1))
+                    else:
+                        metric.update(torch.sigmoid(outputs), labels)
 
         print("Test Loss:", total_loss)
         for metric in metrics:
